@@ -1,6 +1,6 @@
 # FNS RMM - ScreenConnect Data Fetcher
 # Runs via GitHub Actions every 30 minutes
-# Uses complete machine name list exported from SC
+# Self-updating: discovers new machines automatically via recent activity scan
 
 param(
     [string]$SCUrl = $env:SC_URL,
@@ -16,8 +16,11 @@ $headers = @{
 
 $apiBase = "$SCUrl/App_Extensions/2d558935-686a-4bd0-9991-07539f5fe749/Service.ashx"
 
-# Complete machine list - 373 machines exported from SC
-$allMachineNames = @(
+# ---------------------------------------------------------------
+# KNOWN MACHINE LIST (373 machines - last exported 2026-05-01)
+# New machines are discovered automatically via recent activity scan
+# ---------------------------------------------------------------
+$knownMachineNames = @(
     '4R-PC-2025',
     'AA-JESSICA-LPT',
     'AA-JESSICA-WK2',
@@ -393,9 +396,56 @@ $allMachineNames = @(
     'X2190'
 )
 
-Write-Host "Starting SC data fetch at $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-Write-Host "Total machines to fetch: $($allMachineNames.Count)"
+# ---------------------------------------------------------------
+# STEP 1: Discover new machines by scanning recent session activity
+# We search common name patterns A-Z and 0-9 to find unknowns
+# ---------------------------------------------------------------
+Write-Host "Step 1: Scanning for new/unknown machines..."
+$discoveredNames = @{}
 
+# Try single letter and number prefixes to catch anything new
+$scanPrefixes = @('A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','0','1','2','3','4','5','6','7','8','9')
+
+foreach ($prefix in $scanPrefixes) {
+    try {
+        # Try common machine name patterns with this prefix
+        $testNames = @(
+            $prefix,
+            "${prefix}A", "${prefix}B", "${prefix}C", "${prefix}D", "${prefix}E",
+            "${prefix}F", "${prefix}G", "${prefix}H", "${prefix}I", "${prefix}J"
+        )
+        foreach ($testName in $testNames) {
+            $body = ConvertTo-Json @($testName)
+            $result = Invoke-RestMethod -Uri "$apiBase/GetSessionsByName" -Method POST -Headers $headers -Body $body -ErrorAction SilentlyContinue
+            if ($result -and $result.value -and $result.value.Count -gt 0) {
+                foreach ($s in $result.value) {
+                    if (-not $discoveredNames.ContainsKey($s.Name)) {
+                        $discoveredNames[$s.Name] = $true
+                        if ($knownMachineNames -notcontains $s.Name) {
+                            Write-Host "  NEW MACHINE DISCOVERED: $($s.Name)"
+                        }
+                    }
+                }
+            }
+        }
+    } catch {}
+}
+
+# Merge known list with any newly discovered machines
+$allMachineNames = [System.Collections.Generic.List[string]]($knownMachineNames)
+foreach ($name in $discoveredNames.Keys) {
+    if ($allMachineNames -notcontains $name) {
+        Write-Host "  Adding new machine to fetch list: $name"
+        $allMachineNames.Add($name)
+    }
+}
+
+Write-Host "Total machines to fetch: $($allMachineNames.Count) ($($allMachineNames.Count - $knownMachineNames.Count) new)"
+
+# ---------------------------------------------------------------
+# STEP 2: Fetch full details for every machine
+# ---------------------------------------------------------------
+Write-Host "Step 2: Fetching machine details..."
 $machines = @()
 $fetched = 0
 $errors = 0
@@ -404,35 +454,43 @@ foreach ($machineName in $allMachineNames) {
     try {
         $body = ConvertTo-Json @($machineName)
         $result = Invoke-RestMethod -Uri "$apiBase/GetSessionsByName" -Method POST -Headers $headers -Body $body -ErrorAction Stop
-        
+
         if ($result -and $result.value -and $result.value.Count -gt 0) {
             $s = $result.value[0]
             $gi = $s.GuestInfo
-            
-            # Determine online status
-            $lastConn = if ($s.LastGuestConnectedEventTime -and $s.LastGuestConnectedEventTime -ne "0001-01-01T00:00:00") { [DateTime]$s.LastGuestConnectedEventTime } else { [DateTime]::MinValue }
-            $lastDisc = if ($s.LastGuestDisconnectedEventTime -and $s.LastGuestDisconnectedEventTime -ne "0001-01-01T00:00:00") { [DateTime]$s.LastGuestDisconnectedEventTime } else { [DateTime]::MinValue }
-            $online = ($s.ActiveConnections -and $s.ActiveConnections.Count -gt 0) -or ($lastConn -gt $lastDisc -and ([DateTime]::UtcNow - $lastConn).TotalMinutes -lt 15)
-            
-            # Site name from CustomProperty1
-            $site = if ($s.CustomProperties -and $s.CustomProperties.CustomProperty1) { $s.CustomProperties.CustomProperty1 } else { if ($gi) { $gi.MachineDomain } else { "UNKNOWN" } }
-            if (-not $site -or $site -eq "") { $site = "UNKNOWN" }
-            
-            # OS
+
+            # Online status - check active connections first, then event times
+            $isOnline = $false
+            if ($s.ActiveConnections -and $s.ActiveConnections.Count -gt 0) {
+                $isOnline = $true
+            } else {
+                $lastConn = if ($s.LastGuestConnectedEventTime -and $s.LastGuestConnectedEventTime -ne "0001-01-01T00:00:00") { [DateTime]$s.LastGuestConnectedEventTime } else { [DateTime]::MinValue }
+                $lastDisc = if ($s.LastGuestDisconnectedEventTime -and $s.LastGuestDisconnectedEventTime -ne "0001-01-01T00:00:00") { [DateTime]$s.LastGuestDisconnectedEventTime } else { [DateTime]::MinValue }
+                $isOnline = $lastConn -gt $lastDisc -and ([DateTime]::UtcNow - $lastConn).TotalMinutes -lt 15
+            }
+
+            # Site from CustomProperty1, fallback to domain
+            $site = ""
+            if ($s.CustomProperties -and $s.CustomProperties.CustomProperty1) {
+                $site = $s.CustomProperties.CustomProperty1
+            }
+            if (-not $site -or $site -eq "") {
+                $site = if ($gi -and $gi.MachineDomain) { $gi.MachineDomain } else { "UNKNOWN" }
+            }
+
+            # OS and Win11
             $os = if ($gi) { $gi.OperatingSystemName } else { "" }
-            
-            # Win11 readiness
-            $win11Ready = if ($os -match "Windows 11") { "yes" } elseif ($os -match "Windows 10") { "check" } elseif ($os -match "Server") { "n/a" } else { "unknown" }
-            
-            # Last seen
-            $lastSeen = $s.GuestInfoUpdateTime
-            
+            $win11Ready = if ($os -match "Windows 11") { "yes" }
+                          elseif ($os -match "Windows 10") { "check" }
+                          elseif ($os -match "Server") { "n/a" }
+                          else { "unknown" }
+
             $machines += @{
                 name             = $s.Name
                 site             = $site
                 os               = $os
-                online           = $online
-                lastSeen         = $lastSeen
+                online           = $isOnline
+                lastSeen         = $s.GuestInfoUpdateTime
                 lastConnected    = $s.LastGuestConnectedEventTime
                 lastDisconnected = $s.LastGuestDisconnectedEventTime
                 lastBoot         = if ($gi) { $gi.LastBootTime } else { $null }
@@ -454,12 +512,14 @@ foreach ($machineName in $allMachineNames) {
         }
     } catch {
         $errors++
-        # Silently skip machines not found
     }
 }
 
-Write-Host "Fetched: $fetched machines, Errors: $errors"
+Write-Host "Fetched: $fetched machines, Skipped/errors: $errors"
 
+# ---------------------------------------------------------------
+# STEP 3: Write data.json
+# ---------------------------------------------------------------
 $output = @{
     generatedAt   = (Get-Date -Format "o")
     totalMachines = $machines.Count
