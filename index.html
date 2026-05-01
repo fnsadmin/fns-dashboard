@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FNS RMM Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',sans-serif;background:#0a0e17;color:#e2e8f0;min-height:100vh}
+.topbar{background:#0f1623;border-bottom:1px solid #1e2d45;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px}
+.logo{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;color:#4a9eff;letter-spacing:2px}
+.topbar-right{display:flex;align-items:center;gap:16px}
+.last-refresh{font-size:11px;color:#4a5568;font-family:'IBM Plex Mono',monospace}
+.refresh-btn{background:#1a2744;border:1px solid #2a3f6a;color:#4a9eff;font-size:11px;padding:5px 12px;border-radius:4px;cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:all .15s}
+.refresh-btn:hover{background:#1e3050;border-color:#4a9eff}
+.connect-bar{background:#0d1929;border-bottom:1px solid #1e2d45;padding:12px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.connect-bar input{background:#0f1e35;border:1px solid #1e2d45;color:#e2e8f0;padding:6px 12px;border-radius:4px;font-size:12px;font-family:'IBM Plex Mono',monospace;outline:none;transition:border .15s}
+.connect-bar input:focus{border-color:#4a9eff}
+.connect-bar input::placeholder{color:#2d4060}
+.inp-url{width:300px}
+.inp-user{width:200px}
+.inp-pass{width:160px}
+.connect-btn{background:#4a9eff;border:none;color:#fff;padding:7px 16px;border-radius:4px;font-size:12px;font-weight:500;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;transition:all .15s}
+.connect-btn:hover{background:#3a8ef0}
+.demo-btn{background:transparent;border:1px solid #2a3f6a;color:#4a5568;padding:7px 16px;border-radius:4px;font-size:12px;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;transition:all .15s}
+.demo-btn:hover{border-color:#4a9eff;color:#4a9eff}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.dot-ok{background:#22c55e}.dot-warn{background:#f59e0b}.dot-err{background:#ef4444}.dot-off{background:#374151}
+.conn-status{font-size:12px;font-family:'IBM Plex Mono',monospace;color:#4a5568}
+.main{padding:20px 24px}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{background:#0f1623;border:1px solid #1e2d45;border-radius:6px;padding:14px 16px}
+.stat-label{font-size:10px;color:#4a5568;text-transform:uppercase;letter-spacing:1.5px;font-family:'IBM Plex Mono',monospace;margin-bottom:8px}
+.stat-value{font-size:26px;font-weight:600;font-family:'IBM Plex Mono',monospace;line-height:1}
+.v-online{color:#22c55e}.v-warn{color:#f59e0b}.v-err{color:#ef4444}.v-blue{color:#4a9eff}.v-gray{color:#64748b}
+.section-title{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#4a5568;font-family:'IBM Plex Mono',monospace}
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+.filter-bar input{background:#0f1e35;border:1px solid #1e2d45;color:#e2e8f0;padding:5px 10px;border-radius:4px;font-size:12px;font-family:'IBM Plex Mono',monospace;outline:none;width:200px}
+.filter-bar input:focus{border-color:#4a9eff}
+.filter-btn{background:transparent;border:1px solid #1e2d45;color:#64748b;padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:'IBM Plex Mono',monospace;transition:all .15s}
+.filter-btn.active{border-color:#4a9eff;color:#4a9eff;background:#0d1929}
+.filter-btn:hover{border-color:#4a9eff;color:#4a9eff}
+.site-block{background:#0f1623;border:1px solid #1e2d45;border-radius:6px;margin-bottom:16px;overflow:hidden}
+.site-header{padding:10px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;background:#0d1929;border-bottom:1px solid #1e2d45;user-select:none}
+.site-header:hover{background:#111d33}
+.site-name{font-size:13px;font-weight:500;font-family:'IBM Plex Mono',monospace;color:#7dd3fc}
+.site-badges{display:flex;gap:6px;align-items:center}
+.badge{font-size:10px;padding:2px 7px;border-radius:3px;font-family:'IBM Plex Mono',monospace;font-weight:500}
+.badge-online{background:#052e16;color:#22c55e;border:1px solid #166534}
+.badge-warn{background:#2d1a00;color:#f59e0b;border:1px solid #78350f}
+.badge-err{background:#2d0a0a;color:#ef4444;border:1px solid #7f1d1d}
+.machine-table{width:100%;border-collapse:collapse;font-size:12px}
+.machine-table th{padding:7px 14px;text-align:left;font-size:10px;color:#2d4060;font-family:'IBM Plex Mono',monospace;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #1e2d45;font-weight:400}
+.machine-table td{padding:7px 14px;border-bottom:1px solid #0f1929;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#94a3b8}
+.machine-table tr:last-child td{border-bottom:none}
+.machine-table tr:hover td{background:#0d1929}
+.machine-name{color:#e2e8f0;font-weight:500}
+.pill{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:500}
+.pill-on{background:#052e16;color:#22c55e}
+.pill-off{background:#1c1917;color:#78716c}
+.pill-warn{background:#2d1a00;color:#f59e0b}
+.pill-err{background:#2d0a0a;color:#ef4444}
+.pill-ok{background:#0a1e35;color:#4a9eff}
+.pill-na{background:#1a1f2e;color:#374151}
+.progress-bar{height:4px;border-radius:2px;background:#1e2d45;width:60px;display:inline-block;vertical-align:middle;overflow:hidden}
+.progress-fill{height:100%;border-radius:2px}
+.fill-ok{background:#22c55e}.fill-warn{background:#f59e0b}.fill-err{background:#ef4444}
+.alert-banner{background:#1a0a00;border:1px solid #7c2d12;border-radius:6px;padding:10px 16px;margin-bottom:16px;font-size:12px;font-family:'IBM Plex Mono',monospace;color:#f97316;display:none}
+.tab-bar{display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid #1e2d45}
+.tab{padding:8px 16px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:#4a5568;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;text-transform:uppercase;letter-spacing:1px}
+.tab.active{color:#4a9eff;border-bottom-color:#4a9eff}
+.tab:hover{color:#7dd3fc}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.empty-state{padding:40px;text-align:center;color:#2d4060;font-family:'IBM Plex Mono',monospace;font-size:13px}
+.site-body.hidden{display:none}
+.saved-creds{font-size:11px;color:#4a5568;font-family:'IBM Plex Mono',monospace;cursor:pointer;text-decoration:underline;text-decoration-style:dotted}
+.saved-creds:hover{color:#4a9eff}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">FNS // RMM DASHBOARD</div>
+  <div class="topbar-right">
+    <span class="last-refresh" id="lastRefresh">not connected</span>
+    <button class="refresh-btn" onclick="loadData()">&#8635; refresh</button>
+  </div>
+</div>
+
+<div class="connect-bar">
+  <input class="inp-url" id="scUrl" placeholder="https://yourinstance.screenconnect.com" />
+  <input class="inp-user" id="scUser" placeholder="api@thefnsgroup.com" />
+  <input class="inp-pass" id="scPass" type="password" placeholder="API secret" />
+  <button class="connect-btn" onclick="connectSC()">Connect to SC</button>
+  <button class="demo-btn" onclick="loadDemo()">Demo data</button>
+  <span class="conn-status" id="connStatus"><span class="status-dot dot-off"></span>disconnected</span>
+  <span class="saved-creds" onclick="clearCreds()" id="clearBtn" style="display:none">clear saved credentials</span>
+</div>
+
+<div class="main">
+  <div id="alertBanner" class="alert-banner"></div>
+
+  <div class="summary-grid">
+    <div class="stat-card"><div class="stat-label">total machines</div><div class="stat-value v-blue" id="s-total">—</div></div>
+    <div class="stat-card"><div class="stat-label">online now</div><div class="stat-value v-online" id="s-online">—</div></div>
+    <div class="stat-card"><div class="stat-label">offline</div><div class="stat-value v-gray" id="s-offline">—</div></div>
+    <div class="stat-card"><div class="stat-label">disk warnings</div><div class="stat-value v-warn" id="s-disk">—</div></div>
+    <div class="stat-card"><div class="stat-label">update alerts</div><div class="stat-value v-err" id="s-updates">—</div></div>
+    <div class="stat-card"><div class="stat-label">win11 ready</div><div class="stat-value v-online" id="s-win11">—</div></div>
+    <div class="stat-card"><div class="stat-label">sites</div><div class="stat-value v-blue" id="s-sites">—</div></div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab active" onclick="switchTab('machines',this)">machines</div>
+    <div class="tab" onclick="switchTab('alerts',this)">alerts</div>
+  </div>
+
+  <div id="tab-machines" class="tab-content active">
+    <div class="filter-bar">
+      <input id="searchBox" placeholder="search machine or site..." oninput="renderMachines()" />
+      <button class="filter-btn active" id="f-all" onclick="setFilter('all',this)">all</button>
+      <button class="filter-btn" id="f-offline" onclick="setFilter('offline',this)">offline</button>
+      <button class="filter-btn" id="f-disk" onclick="setFilter('disk',this)">disk warn</button>
+      <button class="filter-btn" id="f-updates" onclick="setFilter('updates',this)">update alert</button>
+      <button class="filter-btn" id="f-win10" onclick="setFilter('win10',this)">win10</button>
+    </div>
+    <div id="machineList"><div class="empty-state">connect to ScreenConnect or load demo data to get started</div></div>
+  </div>
+
+  <div id="tab-alerts" class="tab-content">
+    <div id="alertList"><div class="empty-state">no data loaded</div></div>
+  </div>
+</div>
+
+<script>
+let machines = [];
+let activeFilter = 'all';
+
+// Save/load credentials from localStorage
+function saveCreds() {
+  const url = document.getElementById('scUrl').value.trim();
+  const user = document.getElementById('scUser').value.trim();
+  if (url && user) {
+    localStorage.setItem('fns_sc_url', url);
+    localStorage.setItem('fns_sc_user', user);
+    document.getElementById('clearBtn').style.display = 'inline';
+  }
+}
+
+function loadSavedCreds() {
+  const url = localStorage.getItem('fns_sc_url');
+  const user = localStorage.getItem('fns_sc_user');
+  if (url) document.getElementById('scUrl').value = url;
+  if (user) document.getElementById('scUser').value = user;
+  if (url || user) document.getElementById('clearBtn').style.display = 'inline';
+}
+
+function clearCreds() {
+  localStorage.removeItem('fns_sc_url');
+  localStorage.removeItem('fns_sc_user');
+  document.getElementById('scUrl').value = '';
+  document.getElementById('scUser').value = '';
+  document.getElementById('scPass').value = '';
+  document.getElementById('clearBtn').style.display = 'none';
+}
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function setFilter(f, el) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  renderMachines();
+}
+
+async function connectSC() {
+  const url = document.getElementById('scUrl').value.trim();
+  const user = document.getElementById('scUser').value.trim();
+  const pass = document.getElementById('scPass').value.trim();
+  if (!url || !user || !pass) { setStatus('fill in all fields', false); return; }
+  setStatus('connecting...', null);
+  try {
+    const token = btoa(user + ':' + pass);
+    // SC REST API endpoint for sessions
+    const res = await fetch(url + '/api/v1/Sessions?sessionType=Access&groupFilter=', {
+      headers: { 'Authorization': 'Basic ' + token }
+    });
+    if (res.status === 401) throw new Error('invalid credentials');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    machines = parseSCData(data);
+    saveCreds();
+    renderAll();
+    setStatus('connected — ' + machines.length + ' machines', true);
+    document.getElementById('lastRefresh').textContent = 'updated ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    setStatus('failed: ' + e.message + ' — try demo data', false);
+  }
+}
+
+function parseSCData(data) {
+  if (!Array.isArray(data)) return [];
+  return data.map(s => ({
+    name: s.Name || s.GuestMachineName || 'Unknown',
+    site: (s.CustomPropertyValues && s.CustomPropertyValues[0]) || s.GroupFilter || 'UNKNOWN',
+    os: s.GuestOperatingSystemName || '',
+    online: s.OnlineStatusCode === 1,
+    lastSeen: s.GuestLastSeen ? new Date(s.GuestLastSeen) : null,
+    diskC: null,
+    daysSinceUpdate: null,
+    av: 'check SC',
+    win11Ready: s.GuestOperatingSystemName && s.GuestOperatingSystemName.includes('11') ? 'yes' : 'check'
+  }));
+}
+
+async function loadData() {
+  const url = document.getElementById('scUrl').value.trim();
+  const user = document.getElementById('scUser').value.trim();
+  const pass = document.getElementById('scPass').value.trim();
+  if (url && user && pass) connectSC();
+  else if (machines.length > 0) renderAll();
+  else loadDemo();
+}
+
+function loadDemo() {
+  const sites = {WORKGROUP:125,BDR:36,MACKENZIE:31,SIGNATURE:45,FJP:21,CMI:16,WW:11,LERON:10,BTX:14,FNS:6,CSS:8,PRM:6,ATP:10,SHOLLANDER:7,RODEPHSHOLOM:3,PHILIPPHYSICAL:5,millrivergroup:7};
+  const osTypes = ['Windows 11 Pro','Windows 11 Pro','Windows 10 Pro','Windows 10 Pro','Windows 10 Pro','Windows Server 2019','Windows Server 2022'];
+  const avTypes = ['Windows Defender','Windows Defender','Windows Defender','Webroot','SentinelOne'];
+  machines = [];
+  Object.entries(sites).forEach(([site, count]) => {
+    for (let i = 0; i < count; i++) {
+      const os = osTypes[Math.floor(Math.random()*osTypes.length)];
+      const online = Math.random() > 0.22;
+      const diskC = Math.floor(Math.random()*100);
+      const days = Math.floor(Math.random()*400);
+      machines.push({
+        name: site+'-'+['WS','PC','LAPTOP','SRV','NB'][Math.floor(Math.random()*5)]+(i+1).toString().padStart(2,'0'),
+        site, os, online,
+        lastSeen: new Date(Date.now()-Math.random()*86400000*14),
+        diskC, daysSinceUpdate: days,
+        av: avTypes[Math.floor(Math.random()*avTypes.length)],
+        win11Ready: os.includes('11') ? 'yes' : (Math.random()>0.4 ? 'check' : 'no')
+      });
+    }
+  });
+  // Inject real critical machines from handoff doc
+  const criticals = [
+    {name:'MAC-SQL01',site:'MACKENZIE',diskC:2,online:true,daysSinceUpdate:20},
+    {name:'MAC-FS01',site:'MACKENZIE',diskC:5,online:true,daysSinceUpdate:20},
+    {name:'BDR-CONF1',site:'BDR',diskC:1,online:true,daysSinceUpdate:15},
+    {name:'BDR-SCOTT-WK',site:'BDR',diskC:2,online:true,daysSinceUpdate:15},
+    {name:'JP-DANA',site:'JPROPERTY',diskC:2,online:true,daysSinceUpdate:45},
+    {name:'DAVIDFORSTER-PC',site:'LERON',diskC:8,online:true,daysSinceUpdate:30},
+    {name:'LOEB-HOME',site:'WORKGROUP',diskC:5,online:true,daysSinceUpdate:60},
+    {name:'PPT-FRONTDESK',site:'PHILIPPHYSICAL',diskC:55,online:true,daysSinceUpdate:1910},
+    {name:'WPP-WS6-2021',site:'WORKGROUP',diskC:40,online:true,daysSinceUpdate:90},
+    {name:'TED-HP',site:'WW',diskC:60,online:true,daysSinceUpdate:568},
+  ];
+  criticals.forEach(c => {
+    const idx = machines.findIndex(m => m.name === c.name);
+    const obj = {os:'Windows 10 Pro',av:'Windows Defender',win11Ready:'check',...c,lastSeen:new Date()};
+    if (idx >= 0) machines[idx] = obj; else machines.push(obj);
+  });
+  renderAll();
+  setStatus('demo data loaded — '+machines.length+' machines across '+Object.keys(sites).length+' sites', true);
+  document.getElementById('lastRefresh').textContent = 'demo — '+new Date().toLocaleTimeString();
+}
+
+function setStatus(msg, ok) {
+  const el = document.getElementById('connStatus');
+  const dotClass = ok === true ? 'dot-ok' : ok === false ? 'dot-err' : 'dot-warn';
+  el.innerHTML = '<span class="status-dot '+dotClass+'"></span>'+msg;
+}
+
+function renderAll() { renderSummary(); renderMachines(); renderAlerts(); }
+
+function renderSummary() {
+  const total = machines.length;
+  const online = machines.filter(m=>m.online).length;
+  const diskWarn = machines.filter(m=>m.diskC!==null&&m.diskC<20).length;
+  const updateAlert = machines.filter(m=>m.daysSinceUpdate!==null&&m.daysSinceUpdate>30).length;
+  const win11 = machines.filter(m=>m.win11Ready==='yes').length;
+  const sites = new Set(machines.map(m=>m.site)).size;
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-online').textContent = online;
+  document.getElementById('s-offline').textContent = total-online;
+  document.getElementById('s-disk').textContent = diskWarn;
+  document.getElementById('s-updates').textContent = updateAlert;
+  document.getElementById('s-win11').textContent = win11;
+  document.getElementById('s-sites').textContent = sites;
+  const crit = machines.filter(m=>m.diskC!==null&&m.diskC<5);
+  const b = document.getElementById('alertBanner');
+  if (crit.length>0) { b.style.display='block'; b.textContent='CRITICAL: '+crit.length+' machine(s) with <5% disk space: '+crit.map(m=>m.name).join(', '); }
+  else b.style.display='none';
+}
+
+function getFiltered() {
+  const q = (document.getElementById('searchBox').value||'').toLowerCase();
+  return machines.filter(m => {
+    const matchQ = !q||m.name.toLowerCase().includes(q)||m.site.toLowerCase().includes(q);
+    let matchF = true;
+    if (activeFilter==='offline') matchF=!m.online;
+    else if (activeFilter==='disk') matchF=m.diskC!==null&&m.diskC<20;
+    else if (activeFilter==='updates') matchF=m.daysSinceUpdate!==null&&m.daysSinceUpdate>30;
+    else if (activeFilter==='win10') matchF=m.os&&m.os.includes('10');
+    return matchQ&&matchF;
+  });
+}
+
+function renderMachines() {
+  const filtered = getFiltered();
+  const bySite = {};
+  filtered.forEach(m=>{(bySite[m.site]=bySite[m.site]||[]).push(m);});
+  if (!Object.keys(bySite).length) {
+    document.getElementById('machineList').innerHTML='<div class="empty-state">no machines match filter</div>';
+    return;
+  }
+  document.getElementById('machineList').innerHTML = Object.keys(bySite).sort().map(site => {
+    const ms = bySite[site];
+    const onCount = ms.filter(m=>m.online).length;
+    const warnCount = ms.filter(m=>(m.diskC!==null&&m.diskC<20)||(m.daysSinceUpdate!==null&&m.daysSinceUpdate>30)).length;
+    const errCount = ms.filter(m=>m.diskC!==null&&m.diskC<5).length;
+    const rows = ms.map(m => {
+      const dp = m.diskC;
+      const dc = dp===null?'pill-na':dp<5?'pill-err':dp<20?'pill-warn':'pill-ok';
+      const dt = dp===null?'n/a':dp+'%';
+      const fc = dp===null?'':dp<5?'fill-err':dp<20?'fill-warn':'fill-ok';
+      const uc = m.daysSinceUpdate===null?'pill-na':m.daysSinceUpdate>180?'pill-err':m.daysSinceUpdate>30?'pill-warn':'pill-ok';
+      const ut = m.daysSinceUpdate===null?'n/a':m.daysSinceUpdate+'d';
+      const wc = m.win11Ready==='yes'?'pill-ok':m.win11Ready==='no'?'pill-err':'pill-warn';
+      const ac = m.av==='Windows Defender'?'pill-ok':m.av==='Unknown'||m.av==='check SC'?'pill-na':'pill-warn';
+      return '<tr>'+
+        '<td><span class="machine-name">'+m.name+'</span></td>'+
+        '<td><span class="pill '+(m.online?'pill-on':'pill-off')+'">'+(m.online?'online':'offline')+'</span></td>'+
+        '<td>'+(m.lastSeen?timeSince(m.lastSeen):'unknown')+'</td>'+
+        '<td><span class="pill '+dc+'">'+dt+'</span>'+(dp!==null?' <span class="progress-bar"><span class="progress-fill '+fc+'" style="width:'+Math.min(dp,100)+'%"></span></span>':'')+'</td>'+
+        '<td><span class="pill '+uc+'">'+ut+'</span></td>'+
+        '<td style="color:#64748b;font-size:11px">'+(m.os||'—')+'</td>'+
+        '<td><span class="pill '+wc+'">'+(m.win11Ready||'?')+'</span></td>'+
+        '<td><span class="pill '+ac+'" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block">'+(m.av||'—')+'</span></td>'+
+        '</tr>';
+    }).join('');
+    return '<div class="site-block">'+
+      '<div class="site-header" onclick="toggleSite(this)">'+
+        '<span class="site-name">'+site+'</span>'+
+        '<div class="site-badges">'+
+          '<span class="badge badge-online">'+onCount+'/'+ms.length+' online</span>'+
+          (warnCount?'<span class="badge badge-warn">'+warnCount+' warn</span>':'')+
+          (errCount?'<span class="badge badge-err">'+errCount+' critical</span>':'')+
+          '<span style="color:#2d4060;font-size:12px;margin-left:4px">&#9660;</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="site-body">'+
+        '<table class="machine-table"><thead><tr>'+
+          '<th>machine</th><th>status</th><th>last seen</th><th>disk C:</th><th>last update</th><th>os</th><th>win11</th><th>av/edr</th>'+
+        '</tr></thead><tbody>'+rows+'</tbody></table>'+
+      '</div></div>';
+  }).join('');
+}
+
+function renderAlerts() {
+  const alerts = machines
+    .filter(m=>(m.diskC!==null&&m.diskC<20)||(m.daysSinceUpdate!==null&&m.daysSinceUpdate>30)||!m.online)
+    .sort((a,b)=>{
+      const s=m=>(!m.online?1:0)+(m.diskC!==null&&m.diskC<5?10:m.diskC!==null&&m.diskC<20?5:0)+(m.daysSinceUpdate!==null&&m.daysSinceUpdate>180?8:m.daysSinceUpdate!==null&&m.daysSinceUpdate>30?3:0);
+      return s(b)-s(a);
+    });
+  if (!alerts.length) { document.getElementById('alertList').innerHTML='<div class="empty-state">no active alerts</div>'; return; }
+  const rows = alerts.map(m=>{
+    const issues=[];
+    if(m.diskC!==null&&m.diskC<5) issues.push('<span class="pill pill-err">disk critical '+m.diskC+'%</span>');
+    else if(m.diskC!==null&&m.diskC<20) issues.push('<span class="pill pill-warn">disk low '+m.diskC+'%</span>');
+    if(m.daysSinceUpdate!==null&&m.daysSinceUpdate>180) issues.push('<span class="pill pill-err">no updates '+m.daysSinceUpdate+'d</span>');
+    else if(m.daysSinceUpdate!==null&&m.daysSinceUpdate>30) issues.push('<span class="pill pill-warn">updates '+m.daysSinceUpdate+'d ago</span>');
+    if(!m.online) issues.push('<span class="pill pill-off">offline</span>');
+    return '<tr><td><span class="machine-name">'+m.name+'</span></td><td style="color:#4a5568">'+m.site+'</td><td>'+issues.join(' ')+'</td></tr>';
+  }).join('');
+  document.getElementById('alertList').innerHTML='<table class="machine-table"><thead><tr><th>machine</th><th>site</th><th>issues</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+function toggleSite(el) {
+  const body = el.parentElement.querySelector('.site-body');
+  body.classList.toggle('hidden');
+}
+
+function timeSince(date) {
+  const s=Math.floor((Date.now()-date)/1000);
+  if(s<60) return s+'s ago';
+  if(s<3600) return Math.floor(s/60)+'m ago';
+  if(s<86400) return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
+}
+
+// Load saved credentials on startup
+loadSavedCreds();
+</script>
+</body>
+</html>
